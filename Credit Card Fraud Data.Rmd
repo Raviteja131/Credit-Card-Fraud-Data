@@ -1,0 +1,212 @@
+---
+title: "Credit Card Fraud Data"
+author: "Raviteja Moningi"
+date: "2024-04-23"
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Loading packages
+
+library(ranger)
+library(caret)
+library(data.table)
+library(caTools)
+library(gbm)
+
+```
+# ranger: Used for fitting random forest models.
+#caret: Provides functions for training and plotting statistical models, including data splitting and pre-processing.
+#data.table: An extension of data.frame that provides enhancements in data manipulation and performance.
+#caTools: Contains several basic utility functions including functions to split data.
+#gbm: Used for fitting generalized boosted regression models.
+
+
+
+
+```{r}
+#Loading the Data
+
+
+df <- read.csv("creditcard.csv")
+
+#Expolring the Data
+head(df)
+```
+
+# This part loads the dataset named "creditcard.csv" into a data frame df and displays the first few rows using head(df) to get an initial look at the data format and variables.
+
+
+```{r}
+# check the missing values in the data
+
+sum(is.na(df))
+```
+
+# 
+
+#Exploring the data set
+
+```{r}
+
+dim(df)
+
+```
+
+```{r}
+table(df$Class)
+```
+
+```{r}
+summary(df$Amount)
+```
+
+```{r}
+names(df)
+```
+
+```{r}
+var(df$Amount)
+```
+
+# Manipulating the Data
+
+```{r}
+df$Amount=scale(df$Amount)
+df_1=df[,-c(1)]
+head(df_1)
+```
+
+
+# Data Modeling
+
+```{r}
+set.seed(123)
+split = sample.split(df_1$Class,SplitRatio=0.80)
+train_data = subset(df_1,split==TRUE)
+test_data = subset(df_1,split==FALSE)
+dim(train_data)
+```
+
+```{r}
+test_data = subset(df_1,split==FALSE)
+dim(test_data)
+```
+# Logistic Regression Model
+
+```{r}
+lm=glm(Class~.,test_data,family=binomial())
+summary(lm)
+```
+
+# Plotting the Results
+
+```{r}
+plot(lm)
+```
+
+# Applying  model on training set data
+
+```{r}
+lr_predict <- predict(lm,train_data, probability = TRUE)
+cm = table(train_data[, 30], lr_predict > 0.5)
+cm
+```
+```{r}
+lr_predict_test <- predict(lm,test_data, probability = TRUE)
+cm = table(test_data[, 30], lr_predict_test > 0.5)
+cm
+```
+
+plotting decision tree
+
+```{r}
+library(rpart)
+library(rpart.plot)
+decisionTree_model <- rpart(Class ~ . , df, method = 'class')
+predicted_val <- predict(decisionTree_model, df, type = 'class')
+probability <- predict(decisionTree_model, df, type = 'prob')
+rpart.plot(decisionTree_model)
+```
+
+
+```{r}
+
+# Get the time to train the GBM model
+system.time(
+       model_gbm <- gbm(Class ~ .
+               , distribution = "bernoulli"
+               , data = rbind(train_data, test_data)
+               , n.trees = 500
+               , interaction.depth = 3
+               , n.minobsinnode = 100
+               , shrinkage = 0.01
+               , bag.fraction = 0.5
+               , train.fraction = nrow(train_data) / (nrow(train_data) + nrow(test_data))
+)
+)
+
+gbm.iter = gbm.perf(model_gbm, method = "test")
+
+```
+
+
+```{r}
+plot(model_gbm)
+```
+
+## Purpose :The primary goal of this project is to detect fraudulent transactions using a dataset of credit card transactions. The dataset likely contains features related to each transaction, such as the amount, time, and possibly some obfuscated features to protect user privacy. The Class variable indicates whether a transaction is fraudulent.
+
+
+## Process:
+
+# Data Loading and Pre-processing:
+
+# Load the dataset from a CSV file.Perform initial explorations like checking for missing values, understanding the structure of the data, and observing distributions of key variables like transaction amounts.
+
+# Standardize the Amount variable to bring it to a similar scale as other features, which is important for many machine learning models.
+
+## Data Splitting:
+
+# Split the dataset into training and testing sets using a stratified sample based on the class label to ensure that both sets are representative of the overall dataset.
+
+# Model Development and Evaluation: Fit different models, including logistic regression, decision trees, and gradient boosting machines (GBM), to the training data.
+
+# Evaluate these models using the testing data, examining metrics like accuracy, precision, recall, and the confusion matrix.
+
+# Use plots (like decision tree plots, GBM performance, and logistic regression diagnostics) to visually assess model performance and diagnostics.
+
+# Model Tuning and Validation:
+# Predictions are made on both training and testing datasets to check for overfitting and to validate model performance.
+
+# The GBM model's performance is fine-tuned by adjusting parameters like the number of trees, interaction depth, node size, learning rate, and bagging fraction.
+
+## Expected Outcomes:
+
+# The expected outcomes of this project would include:
+
+# Model Accuracy: Understanding how accurately each model can predict fraudulent transactions.
+
+# Insights into Data: Gaining insights into which features are most predictive of fraud, which can inform further feature engineering and data collection strategies.
+
+# Model Comparison: Comparing the performance of different models to choose the best performer for this specific task.
+
+# Operational Model: Developing a predictive model that could potentially be deployed in a real-world scenario to help detect and prevent credit card fraud.
+
+
+# Conclusion:
+
+# Model Diversity : The use of multiple modeling techniques, including logistic regression, decision trees, and gradient boosting machines (GBM), is a strong strategy. This approach allows for comparing different models based on their performance metrics, such as accuracy and recall, which are crucial for imbalanced datasets like those typically found in fraud detection.
+
+# Data Handling : The careful preprocessing and manipulation of the data, such as scaling the Amount feature and removing irrelevant features, help in normalizing the dataset and potentially improve model performance. Additionally, the strategic split of data into training and testing sets ensures that the models are evaluated in a robust manner, simulating real-world predictions and validating the model's ability to generalize.
+
+# Visualizations and Diagnostics :Plotting the results and diagnostics, such as the decision tree visualization and logistic regression diagnostics, aids in interpreting the models' decisions and understanding their behavior. This is particularly useful for stakeholders who may need insights into how decisions are being made or for identifying areas where the model may be improved.
+
+# Scalability and Real-World Application : The project lays a foundation for developing a scalable fraud detection system that can be integrated into transaction processing pipelines to flag fraudulent activities in real time. However, it is important to continuously update and retrain models as new types of fraud emerge and as transaction patterns change over time.
